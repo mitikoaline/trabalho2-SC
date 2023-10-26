@@ -1,5 +1,6 @@
 import random
 from copy import copy
+from PIL import Image
 
 s_box = [
         0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -219,12 +220,68 @@ def aes_decrypt(block, key, n_round):
 
     return state
 
+####################################################################
+# modo ctr
+def aes_ctr_encrypt(plaintext, key, nonce, n_round):
+    ciphertext = []
 
-# teste
-# block = [0x32, 0x88, 0x31, 0xe0, 0x43, 0x5a, 0x31, 0x37, 0xf6, 0x30, 0x98, 0x07, 0xa8, 0x8d, 0xa2, 0x34]
-# key = [15, 21, 113, 201, 71, 217, 232, 89, 12, 183, 173, 214, 175, 127, 103, 152]
-# print(block)
-# ciphertext = aes_encrypt(block, key, 10)
-# print(ciphertext)
-# plaintext = aes_decrypt(ciphertext, key, 10)
-# print(plaintext)
+    for i in range(0, len(plaintext), 16):
+        counter = nonce.to_bytes(16, byteorder='big') # transforma nonce em uma sequencia de 16 bytes
+        count_list = list(counter) # cria uma lista para os 16 bytes, cada elemento equivale a 1 byte
+        keystream = aes_encrypt(count_list, key, n_round)
+
+        # XOR da keystream com o bloco de texto original
+        ciphertext_block = [p ^ k for p, k in zip(plaintext[i:i + 16], keystream)]
+        ciphertext.extend(ciphertext_block)
+        # print(ciphertext_block, i)
+        nonce += 1  # Incrementa o nonce para o próximo bloco
+
+    return ciphertext
+
+def aes_ctr_decrypt(ciphertext, key, nonce, n_round):
+    plaintext = []
+
+    for i in range(0, len(ciphertext), 16):
+        counter = nonce.to_bytes(16, byteorder='big')
+        count_list = list(counter)
+        keystream = aes_encrypt(count_list, key, n_round)
+
+        # XOR da keystream com o bloco de texto cifrado
+        plaintext_block = [c ^ k for c, k in zip(ciphertext[i:i + 16], keystream)]
+        plaintext.extend(plaintext_block)
+        # print(plaintext_block, i)
+        nonce += 1
+
+    return plaintext
+
+
+###############################################################################
+
+# Exemplo de uso:
+plaintext = [0x32, 0x88, 0x31, 0xe0, 0x43, 0x5a, 0x31, 0x37, 0xf6, 0x30, 0x98, 0x07, 0xa8, 0x8d, 0xa2, 0x34]
+key = [15, 21, 113, 201, 71, 217, 232, 89, 12, 183, 173, 214, 175, 127, 103, 152]
+nonce = 0  # Valor inicial do contador (nonce)
+
+# abre imagem
+with Image.open("chihiro.jpg") as img:
+    img_data = img.tobytes()
+
+# gera imagem com 1 rodada
+ciphertext = aes_ctr_encrypt(img_data, key, nonce, 1)  # Cifração em modo CTR
+with Image.frombytes(img.mode, img.size, bytes(ciphertext)) as output_img:
+    output_img.save("rodada-1.jpg")
+
+# gera imagem com 5 rodadas
+ciphertext = aes_ctr_encrypt(img_data, key, nonce, 5)  # Cifração em modo CTR
+with Image.frombytes(img.mode, img.size, bytes(ciphertext)) as output_img:
+    output_img.save("rodada-5.jpg")
+
+# gera imagem com 9 rodadas
+ciphertext = aes_ctr_encrypt(img_data, key, nonce, 9)  # Cifração em modo CTR
+with Image.frombytes(img.mode, img.size, bytes(ciphertext)) as output_img:
+    output_img.save("rodada-9.jpg")
+
+# gera imagem a partir da decifracao
+plaintext_decrypted = aes_ctr_decrypt(ciphertext, key, nonce, 9)  # Decifração em modo CTR
+with Image.frombytes(img.mode, img.size, bytes(plaintext_decrypted)) as output_img:
+    output_img.save("result.jpg")
