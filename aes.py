@@ -1,3 +1,6 @@
+import random
+from copy import copy
+
 s_box = [
         0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
         0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -36,6 +39,9 @@ s_box_inv = [
         0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
 ]
 
+r_con = [0x00000000, 0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000,
+         0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000]
+
 def sub_bytes(state):
     # substitui os bytes do estado de acordo com a tabela s-box
     for i in range(len(state)):
@@ -49,7 +55,7 @@ def sub_bytes_inv(state):
     return state
 
 def rotate(word, n):
-    return word[n:] + word[0:n]
+    return word[n:] + word[:n]
 
 def shift_row(state):
     # faz um shift circular para cada linha
@@ -66,62 +72,159 @@ def shift_row_inv(state):
         state[i*4:i*4+4] = rotate(state[i*4:i*4+4], -i)
     return state
 
-def galois_field_mult(b):
-    # Função para multiplicação no campo de Galois
-    mask = 0x80  # Máscara para verificar o bit mais significativo
-    irr_poly = 0x1B  # Polinômio irreduzível
-    result = b << 1  # Deslocamento para a esquerda
-
-    if b & mask:  # Verifica o bit mais significativo antes do deslocamento
-        result ^= irr_poly  # Aplica o polinômio irreduzível
-
-    return result & 0xFF
-
-def mix_one_column(column):
-    t = column[0] ^ column[1] ^ column[2] ^ column[3]
-    u = column[0]
-    column[0] ^= galois_field_mult(column[0] ^ column[1]) ^ t
-    column[1] ^= galois_field_mult(column[1] ^ column[2]) ^ t
-    column[2] ^= galois_field_mult(column[2] ^ column[3]) ^ t
-    column[3] ^= galois_field_mult(column[3] ^ u) ^ t
-
-    return column
+def galois_mult(a, b):
+    p = 0
+    hiBitSet = 0
+    for i in range(8):
+        if b & 1 == 1:
+            p ^= a
+        hiBitSet = a & 0x80
+        a <<= 1
+        if hiBitSet == 0x80:
+            a ^= 0x1b
+        b >>= 1
+    return p % 256
 
 def mix_columns(state):
-    mixed_state = []
-
+    temp = copy(state)
     for i in range(0, 16, 4):
-        column = state[i:i + 4]
-        mixed_column = mix_one_column(column)
-        mixed_state.extend(mixed_column)
+        state[i + 0] = galois_mult(temp[i + 0],2) ^ galois_mult(temp[i + 3],1) ^ galois_mult(temp[i + 2],1) ^ galois_mult(temp[i + 1],3)
+        state[i + 1] = galois_mult(temp[i + 1],2) ^ galois_mult(temp[i + 0],1) ^ galois_mult(temp[i + 3],1) ^ galois_mult(temp[i + 2],3)
+        state[i + 2] = galois_mult(temp[i + 2],2) ^ galois_mult(temp[i + 1],1) ^ galois_mult(temp[i + 0],1) ^ galois_mult(temp[i + 3],3)
+        state[i + 3] = galois_mult(temp[i + 3],2) ^ galois_mult(temp[i + 2],1) ^ galois_mult(temp[i + 1],1) ^ galois_mult(temp[i + 0],3)
+    return state
 
-    return mixed_state
+def mix_columns_inv(state):
+    temp = copy(state)
+    for i in range(0, 16, 4):
+        state[i + 0] = galois_mult(temp[i + 0],14) ^ galois_mult(temp[i + 3],9) ^ galois_mult(temp[i + 2],13) ^ galois_mult(temp[i + 1],11)
+        state[i + 1] = galois_mult(temp[i + 1],14) ^ galois_mult(temp[i + 0],9) ^ galois_mult(temp[i + 3],13) ^ galois_mult(temp[i + 2],11)
+        state[i + 2] = galois_mult(temp[i + 2],14) ^ galois_mult(temp[i + 1],9) ^ galois_mult(temp[i + 0],13) ^ galois_mult(temp[i + 3],11)
+        state[i + 3] = galois_mult(temp[i + 3],14) ^ galois_mult(temp[i + 2],9) ^ galois_mult(temp[i + 1],13) ^ galois_mult(temp[i + 0],11)
+    return state
 
-# def mix_one_column_inv(column):
-#     t = column[0] ^ column[1] ^ column[2] ^ column[3]
-#     u = column[3]
-#     v = column[2]
-#     w = column[1]
+def dec2hex(list):
+    hex_val = ''
+    if isinstance(list, str):
+        return list
+    for x in list:
+        temp = hex(x)[2:]
+        if len(temp) == 1:
+            temp = '0' + temp
+        hex_val += temp
+    return hex_val
 
-#     column[0] ^= galois_field_mult(column[0] ^ t ^ u)
-#     column[1] ^= galois_field_mult(column[1] ^ t ^ v)
-#     column[2] ^= galois_field_mult(column[2] ^ t ^ w)
-#     column[3] ^= galois_field_mult(column[3] ^ t ^ u)
+def hex2dec(hex):
+    return int(str(hex), 16)
 
-#     return column
+def hexor(hex1, hex2):
+    dec1 = hex2dec(hex1)
+    dec2 = hex2dec(hex2)
 
-# def mix_columns_inv(state):
-#     inv_mixed_state = []
+    xord = dec1 ^ dec2
+    hexed = hex(xord)[2:]
 
-#     for i in range(0, 16, 4):
-#         column = state[i:i + 4]
-#         inv_mixed_column = mix_one_column_inv(column)
-#         inv_mixed_state.extend(inv_mixed_column)
+    if len(hexed) != 8:
+        hexed = '0' + hexed
+        
+    return hexed
 
-#     return inv_mixed_state
+def key_expansion(key):
+    w = [[]]*44
 
-state=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
-result = mix_columns(state)
-print(result)
-# result = mix_columns_inv(result)
-# print(result)
+    for i in range(4):
+        w[i] = [key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]]
+
+    for i in range(4, 44):
+        temp = w[i-1]
+        word = w[i-4]
+
+        if i % 4 == 0:
+            x = rotate(temp, 1)
+            y = sub_bytes(x) # vai conter uma lista de inteiros
+            rcon = r_con[int(i/4)]
+
+            temp = hexor(dec2hex(y), hex(rcon)[2:]) 
+
+        xord = hexor(dec2hex(word), dec2hex(temp))
+
+        w[i] = [hex2dec(xord[:2]),
+                hex2dec(xord[2:4]),
+                hex2dec(xord[4:6]),
+                hex2dec(xord[6:8])]
+
+    exp_key = []
+    for list in w:
+        for val in list:
+            exp_key.append(val)
+
+    return exp_key # retorna uma lista de inteiros
+
+def add_round_key(key, state):
+    for i in range(len(state)):
+        state[i] = state[i] ^ key[i]
+    return state
+
+def generate_key():
+    key_list = []
+
+    bytes_key = bytearray(random.getrandbits(8) for _ in range(16))
+    
+    hex_key = ''.join('{:02x}'.format(byte) for byte in bytes_key)
+
+    for i in range(0, len(hex_key), 2):
+        temp = hex2dec(hex_key[i:i+2])
+        key_list.append(temp)
+
+    return key_list
+
+def aes_encrypt(block, key, n_round):
+    exp_key = key_expansion(key)
+
+    block = add_round_key(exp_key[:16], block)
+    del exp_key[:16]
+
+    for i in range(n_round - 1):
+        state = sub_bytes(block)
+        state = shift_row(state)
+        state = mix_columns(state)
+        state = add_round_key(exp_key[:16], state)
+        del exp_key[:16]
+
+    # ultima rodada
+    state = sub_bytes(block)
+    state = shift_row(state)
+    state = add_round_key(exp_key[:16], state)
+    del exp_key[:16]
+
+    return state
+
+def aes_decrypt(block, key, n_round):
+    exp_key = key_expansion(key)
+
+    state = add_round_key(exp_key[-16:], block)
+    del exp_key[-16:]
+
+    for i in range(n_round - 1):
+        state = shift_row_inv(state)
+        state = sub_bytes_inv(state)
+        state = add_round_key(exp_key[-16:], state)
+        del exp_key[-16:]
+        state = mix_columns_inv(state)
+
+    state = shift_row_inv(state)
+    state = sub_bytes_inv(state)
+    state = add_round_key(exp_key[:16], state)
+    del exp_key[-16:]
+
+    return state
+
+
+# teste
+# block = [0x32, 0x88, 0x31, 0xe0, 0x43, 0x5a, 0x31, 0x37, 0xf6, 0x30, 0x98, 0x07, 0xa8, 0x8d, 0xa2, 0x34]
+# key = [15, 21, 113, 201, 71, 217, 232, 89, 12, 183, 173, 214, 175, 127, 103, 152]
+# print(block)
+# ciphertext = aes_encrypt(block, key, 10)
+# print(ciphertext)
+# plaintext = aes_decrypt(ciphertext, key, 10)
+# print(plaintext)
