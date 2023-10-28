@@ -1,0 +1,5 @@
+O padrão de criptografia avançada - advanced encryption standard (AES), também conhecido por seu nome original Rijndael,[3] é uma especificação para a criptografia de dados eletrônicos estabelecida pelo instituto nacional de padrões e tecnologia dos E.U.A. (NIST) em 2001.[4]
+
+O AES é um subconjunto da cifra de bloco Rijndael[3] desenvolvida por dois criptógrafos belgas, Vincent Rijmen e Joan Daemen, que submeteram uma proposta[5] ​ao NIST durante o processo de seleção do AES.[6] A Rijndael é uma família de cifras com diferentes tamanhos de chave e bloco. Para o AES, o NIST selecionou três membros da família Rijndael, cada um com um tamanho de bloco de 128 bits, mas três comprimentos de chave diferentes: 128, 192 e 256 bits.
+
+O AES foi adotado pelo governo dos Estados Unidos da América. Ele substitui o padrão de criptografia de dados (DES),[7] que foi publicado em 1977. O algoritmo descrito pelo AES é um algoritmo de chave simétrica, o que significa que a mesma chave é usada para criptografar e descriptografar os dados. 
