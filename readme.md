@@ -11,6 +11,8 @@ Deixe as imagens e os arquivos de texto dentro da mesma pasta do código do prog
 
 O programa possui quatro opções e não precisa ficar finalizando para utilizá-lo.
 
+A imagem gerada sempre será "result.jpg"
+
 ## Você pode:
 
 ### [1] Cifrar e decifrar um arquivo de texto
